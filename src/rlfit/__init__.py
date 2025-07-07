@@ -1,1 +1,1 @@
-from .rlfit import *
+from .rlfit import RLFit
