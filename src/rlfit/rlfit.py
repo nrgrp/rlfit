@@ -6,12 +6,14 @@ from concurrent.futures import ProcessPoolExecutor
 
 
 class RLFit:
-    def __init__(self, horizon_len=-1):
+    def __init__(self, horizon_len=-1, share_param=False):
         if (horizon_len != -1) and (horizon_len <= 0):
             raise ValueError("'horizon_len' must be positive or -1")
         if not isinstance(horizon_len, int):
             raise ValueError("'horizon_len' must be an integer")
         self.horizon_len = horizon_len
+
+        self.share_param = share_param
 
         # for recovering parameters
         self._num_repeats = None
@@ -61,7 +63,13 @@ class RLFit:
         else:
             p = self.horizon_len
 
-        Gs = [cp.Variable((m, p)) for _ in range(k)]
+        if not self.share_param:
+            Gs = [cp.Variable((m, p)) for _ in range(k)]
+        else:
+            Gs = []
+            for _ in range(k):
+                g = cp.Variable(p)
+                Gs.append(cp.vstack([g for _ in range(m)]))
         X = []
         Y = actions
         for t in range(n):
