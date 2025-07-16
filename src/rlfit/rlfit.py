@@ -135,8 +135,8 @@ class RLFit:
                 results.append((best_alpha, best_beta))
         htalpha, htbeta = np.array(results).T
         if k == 1:
-            self.alpha_ = htalpha
-            self.beta_ = htbeta
+            self.alpha_ = [htalpha]
+            self.beta_ = [htbeta]
         else:
             self.alpha_ = [htalpha[i * m: (i + 1) * m] for i in range(k)]
             self.beta_ = [htbeta[i * m: (i + 1) * m] for i in range(k)]
