@@ -6,7 +6,16 @@ from concurrent.futures import ProcessPoolExecutor
 
 
 class RLFit:
+    """
+    Fitting a reinforcement learning model to behavior data under bandits.
+    """
     def __init__(self, horizon_len=-1, share_param=False):
+        """
+        Parameters
+        ----------
+        horizon_len: -1 or a positive integer; the horizon length $p$
+        share_param: bool; whether the RL model parameters ($\alpha$ and $\beta$) are shared across bandits
+        """
         if (horizon_len != -1) and (horizon_len <= 0):
             raise ValueError("'horizon_len' must be positive or -1")
         if not isinstance(horizon_len, int):
@@ -32,6 +41,23 @@ class RLFit:
         return f"{class_name}({', '.join(params)})"
 
     def fit(self, rewards, actions, w=1, reduced_tol_gap_abs=5e-5, reduced_tol_gap_rel=5e-5):
+        """
+        Fit the RL model by solving the relaxed convex program.
+
+        Every time this method is called, the model parameters will also be reset.
+        Hence, the 'fit_param' method needs to be called after each fitting to recover the corresponding parameters.
+
+        Let $n$ be the number of time steps, $m$ be the number of arms, $k$ be the number of subreward signals.
+
+        Parameters
+        ----------
+        rewards: (a list of) $(n \times m)$-dimensional ndarray(s); reward (sub)signals $u(t)$
+        actions: $(n \times m)$-dimensional ndarray with each row being a one-hot vector; action labels $y(t)$
+        w: 1 by default or a $k$-dimensional ndarray,
+            where $k$ should be the same as the length of the argument 'rewards'; subreward mixing weights
+        reduced_tol_gap_abs: positive float, 5e-5 by default; Clarabel solver option
+        reduced_tol_gap_rel: positive float, 5e-5 by default; Clarabel solver option
+        """
         if isinstance(rewards, np.ndarray):
             n, m = rewards.shape
             k = 1
@@ -105,8 +131,22 @@ class RLFit:
 
     def fit_param(self, min_beta=0, max_beta=1e3, num_repeats=5,
                   solver='L-BFGS-B', concurrent=True, num_workers=4):
+        """
+        Recover the RL model parameters after fitting.
+        Should be called after calling the 'fit' method.
+
+        Parameters
+        ----------
+        min_beta: float or list of float with length $k$; lower bound on the value of betas
+        max_beta: float or list of float with length $k$; upper bound on the value of betas
+        num_repeats: positive integer; number of repeated initiations
+        solver: one of 'Nelder-Mead', 'L-BFGS-B', 'TNC', 'SLSQP', 'Powell', 'trust-constr', 'COBYLA', and 'COBYQA',
+            'L-BFGS-B' by default
+        concurrent: bool; whether concurrent computation is used
+        num_workers: positive integer, 4 by default; number of parallel workers, only used if 'concurrent=True'
+        """
         if self.G_ is None:
-            raise RuntimeError("model not fit, run 'fit()' method on the data first")
+            raise RuntimeError("model not fit, run 'fit' method on the data first")
 
         k = len(self.G_)
         m, p = self.G_[0].shape
@@ -150,6 +190,23 @@ class RLFit:
             self.beta_ = [htbeta[i * m: (i + 1) * m] for i in range(k)]
 
     def score(self, rewards, actions, w=1):
+        """
+        Evaluate the fitting log-likelihood of some data.
+
+        Parameters
+        ----------
+        rewards: (a list of) $(n \times m)$-dimensional ndarray(s); reward (sub)signals $u(t)$
+        actions: $(n \times m)$-dimensional ndarray with each row being a one-hot vector; action labels $y(t)$
+        w: 1 by default or a $k$-dimensional ndarray,
+            where $k$ should be the same as the length of the argument 'rewards'; subreward mixing weights
+
+        Returns
+        -------
+        log-likelihood: float
+        """
+        if self.G_ is None:
+            raise RuntimeError("model not fit, run 'fit' method on the data first")
+
         if isinstance(rewards, np.ndarray):
             n, m = rewards.shape
             k = 1
@@ -164,6 +221,9 @@ class RLFit:
             k = len(shapes)
         else:
             raise TypeError("'rewards' must be a ndarray or a list of ndarrays")
+
+        if k != len(self.G_):
+            raise ValueError("mismatch between the number of subrewards in the fitting and evaluation data")
 
         if not isinstance(actions, np.ndarray):
             raise TypeError("'actions' must be a ndarray")
@@ -205,6 +265,30 @@ class RLFit:
         return np.sum(np.sum(np.multiply(X, Y), axis=1) - sp.special.logsumexp(X, axis=1))
 
     def predict(self, rewards, w=1, return_value=False, return_subvalue=False):
+        """
+        Predict the action selection probabilities, value functions (optional), and subvalue functions (optional)
+        given some dataset.
+
+        Parameters
+        ----------
+        rewards: (a list of) $(n \times m)$-dimensional ndarray(s); reward (sub)signals $u(t)$
+        w: 1 by default or a $k$-dimensional ndarray,
+            where $k$ should be the same as the length of the argument 'rewards'; subreward mixing weights
+
+        return_value: bool, False by default; whether to return the value functions
+        return_subvalue: bool, False by default; whether to return the subvalue functions
+
+        Returns
+        -------
+        policy: $(n \times m)$-dimensional ndarray; the predicted action selection probability for each time step
+        value: $(n \times m)$-dimensional ndarray; the predicted value function for each time step
+            returned only if 'return_value=True'
+        subvalue: list of $(n \times m)$-dimensional ndarray with length $k$;
+            the predicted value function for each time step, returned only if 'return_subvalue=True'
+        """
+        if self.G_ is None:
+            raise RuntimeError("model not fit, run 'fit' method on the data first")
+
         if isinstance(rewards, np.ndarray):
             n, m = rewards.shape
             k = 1
@@ -219,6 +303,9 @@ class RLFit:
             k = len(shapes)
         else:
             raise TypeError("'rewards' must be a ndarray or a list of ndarrays")
+
+        if k != len(self.G_):
+            raise ValueError("mismatch between the number of subrewards in the fitting and evaluation data")
 
         w = np.ones(k) if w == 1 else w
         if k != w.shape[0]:
