@@ -1,6 +1,6 @@
 [project]
 name = "rlfit"
-version = "0.0.0"
+version = "0.1.0"
 description = "Fitting reinforcement learning model to behavior data under bandits."
 authors = [
     {name = "Hao Zhu", email = "zhuh@cs.uni-freiburg.de"},
