@@ -1,7 +1,7 @@
 # rlfit: Fitting Reinforcement Learning Model to Behavior Data under Bandits
 
 Python package companion to the paper
-"Fitting Reinforcement Learning Modelto Behavior Data under Bandits".
+"[Fitting Reinforcement Learning Modelto Behavior Data under Bandits](https://haozhu10015.github.io/papers/fit_rl_mab.html)".
 This library is collated from the early version code in
 [this repository](https://github.com/nrgrp/fit_rl_mab)
 which was used for the numerical experiments in the paper.
